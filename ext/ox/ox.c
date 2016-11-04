@@ -195,10 +195,10 @@ defuse_bom(char *xml, Options options) {
 	    rb_raise(ox_parse_error_class, "Invalid BOM in XML string.\n");
 	}
 	break;
-#if 0
+#if HAS_ENCODING_SUPPORT
     case 0xFE: /* UTF-16BE */
 	if (0xFF == (uint8_t)xml[1]) {
-	    options->rb_enc = ox_utf16be_encoding;
+	    options->rb_enc = rb_enc_find("UTF-16BE");
 	    xml += 2;
 	} else {
 	    rb_raise(ox_parse_error_class, "Invalid BOM in XML string.\n");
@@ -207,10 +207,10 @@ defuse_bom(char *xml, Options options) {
     case 0xFF: /* UTF-16LE or UTF-32LE */
 	if (0xFE == (uint8_t)xml[1]) {
 	    if (0x00 == (uint8_t)xml[2] && 0x00 == (uint8_t)xml[3]) {
-		options->rb_enc = ox_utf32le_encoding;
+		options->rb_enc = rb_enc_find("UTF-32LE");
 		xml += 4;
 	    } else {
-		options->rb_enc = ox_utf16le_encoding;
+		options->rb_enc = rb_enc_find("UTF-16LE");
 		xml += 2;
 	    }
 	} else {
@@ -219,7 +219,7 @@ defuse_bom(char *xml, Options options) {
 	break;
     case 0x00: /* UTF-32BE */
 	if (0x00 == (uint8_t)xml[1] && 0xFE == (uint8_t)xml[2] && 0xFF == (uint8_t)xml[3]) {
-	    options->rb_enc = ox_utf32be_encoding;
+	    options->rb_enc = rb_enc_find("UTF-32BE");
 	    xml += 4;
 	} else {
 	    rb_raise(ox_parse_error_class, "Invalid BOM in XML string.\n");
@@ -239,7 +239,7 @@ hints_to_overlay(Hints hints) {
     Hint		h;
     int			i;
     VALUE		ov;
-    
+
     for (i = hints->size, h = hints->hints; 0 < i; i--, h++) {
 	switch (h->overlay) {
 	case InactiveOverlay:	ov = inactive_sym;	break;
@@ -250,7 +250,7 @@ hints_to_overlay(Hints hints) {
 	default:		ov = active_sym;	break;
 	}
 	rb_hash_aset(overlay, rb_str_new2(h->name), ov);
-    }    
+    }
     return overlay;
 }
 
@@ -279,7 +279,7 @@ hints_to_overlay(Hints hints) {
  *   - _:block_ - block this and all children callbacks
  *   - _:off_ - block this element and it's children unless the child element is active
  *   - _:abort_ - abort the html processing and return
- * 
+ *
  * *return* [Hash] all current option settings.
  *
  * Note that an indent of less than zero will result in a tight one line output
@@ -346,7 +346,7 @@ static int
 set_overlay(VALUE key, VALUE value, VALUE ctx) {
     Hints	hints = (Hints)ctx;
     Hint	hint;
-    
+
     if (NULL != (hint = ox_hint_find(hints, StringValuePtr(key)))) {
 	if (active_sym == value) {
 	    hint->overlay = ActiveOverlay;
@@ -422,7 +422,7 @@ set_def_opts(VALUE self, VALUE opts) {
     };
     YesNoOpt	o;
     VALUE	v;
-    
+
     Check_Type(opts, T_HASH);
 
     v = rb_hash_aref(opts, ox_encoding_sym);
@@ -662,7 +662,7 @@ load(char *xml, int argc, VALUE *argv, VALUE self, VALUE encoding, Err err) {
     if (1 == argc && rb_cHash == rb_obj_class(*argv)) {
 	VALUE	h = *argv;
 	VALUE	v;
-	
+
 	if (Qnil != (v = rb_hash_lookup(h, mode_sym))) {
 	    if (object_sym == v) {
 		options.mode = ObjMode;
@@ -943,14 +943,14 @@ sax_parse(int argc, VALUE *argv, VALUE self) {
     options.skip = ox_default_options.skip;
     options.hints = NULL;
     strcpy(options.strip_ns, ox_default_options.strip_ns);
-    
+
     if (argc < 2) {
 	rb_raise(ox_parse_error_class, "Wrong number of arguments to sax_parse.\n");
     }
     if (3 <= argc && rb_cHash == rb_obj_class(argv[2])) {
 	VALUE	h = argv[2];
 	VALUE	v;
-	
+
 	if (Qnil != (v = rb_hash_lookup(h, convert_special_sym))) {
 	    options.convert_special = (Qtrue == v);
 	}
@@ -1015,7 +1015,7 @@ static VALUE
 sax_html(int argc, VALUE *argv, VALUE self) {
     struct _SaxOptions	options;
     bool		free_hints = false;
-    
+
     options.symbolize = (No != ox_default_options.sym_keys);
     options.convert_special = ox_default_options.convert_special;
     options.smart = true;
@@ -1025,14 +1025,14 @@ sax_html(int argc, VALUE *argv, VALUE self) {
 	options.hints = ox_hints_html();
     }
     *options.strip_ns = '\0';
-    
+
     if (argc < 2) {
 	rb_raise(ox_parse_error_class, "Wrong number of arguments to sax_html.\n");
     }
     if (3 <= argc && rb_cHash == rb_obj_class(argv[2])) {
 	volatile VALUE	h = argv[2];
 	volatile VALUE	v;
-	
+
 	if (Qnil != (v = rb_hash_lookup(h, convert_special_sym))) {
 	    options.convert_special = (Qtrue == v);
 	}
@@ -1050,7 +1050,7 @@ sax_html(int argc, VALUE *argv, VALUE self) {
 	}
 	if (Qnil != (v = rb_hash_lookup(h, overlay_sym))) {
 	    int	cnt;
-	    
+
 	    Check_Type(v, T_HASH);
 	    cnt = (int)RHASH_SIZE(v);
 	    if (0 == cnt) {
@@ -1080,10 +1080,10 @@ parse_dump_options(VALUE ropts, Options copts) {
 	{ Qnil, 0 }
     };
     YesNoOpt	o;
-    
+
     if (rb_cHash == rb_obj_class(ropts)) {
 	VALUE	v;
-	
+
 	if (Qnil != (v = rb_hash_lookup(ropts, ox_indent_sym))) {
 #ifdef RUBY_INTEGER_UNIFICATION
 	    if (rb_cInteger != rb_obj_class(v)) {
@@ -1140,7 +1140,7 @@ parse_dump_options(VALUE ropts, Options copts) {
 	    *copts->inv_repl = (char)slen;
 	    copts->allow_invalid = No;
 	}
-	
+
 	for (o = ynos; 0 != o->attr; o++) {
 	    if (Qnil != (v = rb_hash_lookup(ropts, o->sym))) {
 		VALUE	    c = rb_obj_class(v);
@@ -1177,7 +1177,7 @@ dump(int argc, VALUE *argv, VALUE self) {
     char		*xml;
     struct _Options	copts = ox_default_options;
     VALUE		rstr;
-    
+
     if (2 == argc) {
 	parse_dump_options(argv[1], &copts);
     }
@@ -1218,7 +1218,7 @@ dump(int argc, VALUE *argv, VALUE self) {
 static VALUE
 to_file(int argc, VALUE *argv, VALUE self) {
     struct _Options	copts = ox_default_options;
-    
+
     if (3 == argc) {
 	parse_dump_options(argv[2], &copts);
     }
@@ -1265,9 +1265,9 @@ void Init_ox() {
     rb_define_module_function(Ox, "to_file", to_file, -1);
 
     rb_define_module_function(Ox, "sax_html_overlay", sax_html_overlay, 0);
-    
+
     ox_init_builder(Ox);
-    
+
     rb_require("time");
     rb_require("date");
     rb_require("bigdecimal");
@@ -1409,7 +1409,7 @@ void Init_ox() {
     rb_define _module_function(Ox, "cache_test", cache_test, 0);
     rb_define _module_function(Ox, "cache8_test", cache8_test, 0);
 #endif
-    
+
 #if HAS_ENCODING_SUPPORT
     ox_utf8_encoding = rb_enc_find("UTF-8");
 #elif HAS_PRIVATE_ENCODING
